@@ -40,11 +40,25 @@ describe "Authentication" do
 			describe "followed by signout" do
 				before { click_link 'Sign out' }
 		        it { should have_link('Sign in') }
+		        it { should_not have_link('Users', 		href: users_path) }
+				it { should_not have_link('Profile', 	href: user_path(user)) }
+				it { should_not have_link('Settings', 	href: edit_user_path(user)) }
+				it { should_not have_link('Sign out', 	href: signout_path) }
 		    end
 	    end
     end
 
     describe "authorization" do
+    	describe "for signed-in users" do
+    		let(:user) { FactoryGirl.create(:user) }
+    		before { sign_in user, no_capybara: true }
+
+    		describe "when attempting to visit a signup page" do
+    			before { get signup_path }
+    			specify { expect(response).to redirect_to(root_url) }
+    		end
+    	end
+
     	describe "for non-singed-in users" do
     		let(:user) { FactoryGirl.create(:user) }
 
@@ -60,6 +74,20 @@ describe "Authentication" do
     				it "should render the desired protected page" do
     					expect(page).to have_title("Edit user")
     				end
+
+                    describe "when signin in again" do
+                        before do
+                            click_link "Sign out"
+                            visit signin_path
+                            fill_in "Email",    with: user.email
+                            fill_in "Password", with: user.password
+                            click_button "Sign in"
+                        end
+
+                        it "should render the default (profile) page" do
+                            expect(page).to have_title(user.name)
+                        end
+                    end
     			end
     		end
 
@@ -109,5 +137,16 @@ describe "Authentication" do
       			specify { expect(response).to redirect_to(root_url) }
       		end
     	end
+
+        describe "as admin user" do 
+            let(:admin_user) { FactoryGirl.create(:admin) }
+            before { sign_in admin_user, no_capybara: true }
+
+            describe "admin can't delete himself" do
+                before { delete user_path(admin_user) }
+                specify { expect(response).not_to redirect_to(users_url) }
+                specify { expect(response.body).to match(full_title('All users')) }
+            end
+        end
     end
 end
